@@ -1,0 +1,56 @@
+<?php
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<template x-for="product in products" :key="product.objectID">
+    <div class="border border-tertiary rounded-lg p-4 flex flex-col sm:flex-row gap-4">
+        <div class="w-full md:w-1/6 max-w-[80px] flex justify-center">
+            <a
+                :href="product.url"
+                class="overflow-hidden flex justify-center items-center h-20"
+                @click="trackProductClick(product)"
+            >
+                <img
+                    :src="product.image_url"
+                    :alt="product.name"
+                    class="h-20 object-contain hover:scale-105 transition-transform duration-300 ease-in-out"
+                >
+            </a>
+        </div>
+
+        <div class="w-full sm:w-3/6 lg:w-4/6 flex flex-col">
+            <div class="product text-sm mb-2" x-html="product.displaySku"></div>
+            <a
+                class="font-bold text-lg mb-2 text-l text-primary"
+                :href="product.url"
+                @click="trackProductClick(product)"
+                x-text="product.name"
+            ></a>
+            <p x-show="product.description !== 'undefined'" x-text="product.description"></p>
+        </div>
+        <div
+            class="text-lg mb-3 font-bold product-price"
+            x-html="product.customerPrice"
+            :class="{ 'loading': isLoading }"
+            x-show="isLoggedIn"
+        ></div>
+        <div
+            class="product mb-6 product-price"
+            x-show="!isLoading"
+            x-html="product.srpPrice"
+            :class="{ 'font-bold text-lg': !isLoggedIn, 'text-sm': isLoggedIn, 'loading': isLoading }"
+        ></div>
+        <div class="w-full sm:w-2/6 lg:w-1/6 sm:ml-auto flex flex-col items-center justify-center">
+            <a
+                :href="product.url"
+                @click="trackProductClick(product)"
+                class="block w-full btn-primary !py-3 hover:no-underline text-white text-center rounded-md"
+            >
+                <?= $escaper->escapeHtml(__('View product')); ?>
+            </a>
+        </div>
+    </div>
+</template>

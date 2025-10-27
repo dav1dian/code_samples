@@ -1,0 +1,116 @@
+<?php
+declare(strict_types=1);
+
+?>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('initFetchPrice', () => ({
+            mainPrice: '',
+            srpPriceInclVat: [],
+            productVariantLowestMainPrice: null,
+            productVariantLowestSrpPriceInclVat: null,
+            childProducts: [],
+            
+            async fetchPrices(skus = '') {
+                try {
+                    const response = await fetch(BASE_URL + 'rest/V1/priceintegration/prices', {
+                        method: 'post',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            skus: skus.split(',')
+                        })
+                    });
+
+                    if (!response.ok) {
+                        console.warn('Something went wrong');
+                        return;
+                    }
+
+                    return await response.json();
+                } catch (err) {
+                    console.warn(err);
+                }
+            },
+
+            async fetchSimpleProductPrice(sku) {
+                let fetchedPrices = await this.fetchPrices(sku);
+                fetchedPrices = Object.values(JSON.parse(fetchedPrices));
+
+                // set main price
+                this.mainPrice = this.getPrice(fetchedPrices[0]);
+
+                // set srp price (incl. VAT)
+                // NOTE: don't use hyva.formatPrice since we're fetching priceDisplay format from backend
+                this.srpPriceInclVat = fetchedPrices[0]?.srp_price_incl_vat?.priceDisplay;
+            },
+
+            async fetchConfigurableProductPrice(productVariantsSkus) {
+                let fetchedPrices = await this.fetchPrices(productVariantsSkus);
+                fetchedPrices = Object.values(JSON.parse(fetchedPrices));
+
+                // set lowest price of product variants assigned to parent (configurable) product
+                if (this.isLoggedIn) {
+                    const lowestPriceLoggedUser = fetchedPrices?.find(
+                        fetchedPriceItem => parseInt(fetchedPriceItem?.customer_price_excl_vat?.price)
+                            === parseInt(Math.min(...fetchedPrices?.map(item => item?.customer_price_excl_vat?.price)))
+                    );
+
+                    // NOTE: don't use hyva.formatPrice since we're fetching priceDisplay format from backend
+                    this.productVariantLowestMainPrice
+                        = lowestPriceLoggedUser?.customer_price_excl_vat?.priceDisplay;
+                    this.productVariantLowestSrpPriceInclVat
+                        = lowestPriceLoggedUser?.srp_price_incl_vat?.priceDisplay;
+                } else {
+                    // NOTE: don't use hyva.formatPrice since we're fetching priceDisplay format from backend
+                    this.productVariantLowestMainPrice = fetchedPrices?.find(
+                        fetchedPriceItem => parseInt(fetchedPriceItem?.srp_price_incl_vat?.price)
+                            === parseInt(Math.min(...fetchedPrices?.map(item => item?.srp_price_incl_vat?.price)))
+                    )?.srp_price_incl_vat?.priceDisplay;
+                }
+            },
+
+            async fetchChildProductsPricesData(productVariantsSkus) {
+                let fetchedPrices = await this.fetchPrices(productVariantsSkus);
+                fetchedPrices = JSON.parse(fetchedPrices);
+
+                // set child products prices of configurable product
+                if (!fetchedPrices) {
+                    return false;
+                }
+
+                for (const item in fetchedPrices) {
+                    this.childProducts.push({
+                        sku: item,
+                        price: this.getPrice(fetchedPrices[item])
+                    });
+                }
+            },
+
+            getPrice(priceItem) {
+                // NOTE: don't use hyva.formatPrice since we're fetching priceDisplay format from backend
+                return this.isLoggedIn
+                    ? priceItem?.customer_price_excl_vat?.priceDisplay
+                    : priceItem?.srp_price_incl_vat?.priceDisplay;
+            },
+
+            getProductVariantPrice(productVariantSku) {
+                let childProductPrice = '';
+
+                this.childProducts?.forEach(childProduct => {
+                    if (childProduct?.sku === productVariantSku && childProduct?.price) {
+                        childProductPrice = childProduct?.price;
+                    }
+                });
+
+                return childProductPrice;
+            },
+
+            showAddToCart() {
+                return this.isLoggedIn && this.mainPrice;
+            }
+        }));
+    });
+</script>
